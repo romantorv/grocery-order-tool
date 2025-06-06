@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grocery Ordering Helper</title>
+    <style>
+        body {
+            width: 400px;
+            min-height: 300px;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        #itemListInput {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        #itemListInput:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        #startButton {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        #startButton:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+
+        #startButton:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status-section {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .status-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #333;
+        }
+
+        #statusList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        #statusList li {
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            border-left: 3px solid #ddd;
+            font-size: 12px;
+        }
+
+        .item-url {
+            font-weight: 500;
+            color: #333;
+            display: block;
+            word-break: break-all;
+            margin-bottom: 2px;
+        }
+
+        .item-quantity {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .status {
+            display: block;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .status-waiting {
+            color: #666;
+            border-left-color: #ddd;
+        }
+
+        .status-processing {
+            color: #2196F3;
+            border-left-color: #2196F3;
+        }
+
+        .status-added {
+            color: #4CAF50;
+            border-left-color: #4CAF50;
+        }
+
+        .status-error {
+            color: #f44336;
+            border-left-color: #f44336;
+        }
+
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .success-message {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h2>🛒 Grocery Helper</h2>
+
+    <div class="input-section">
+        <label for="itemListInput">Paste your grocery items (URL and quantity per line):</label>
+        <textarea
+            id="itemListInput"
+            placeholder="https://example.com/product1 2&#10;https://example.com/product2 1&#10;https://example.com/product3 3"
+        ></textarea>
+        <div class="help-text">
+            Format: URL followed by quantity, one item per line
+        </div>
+    </div>
+
+    <button id="startButton">Start Adding Items to Cart</button>
+
+    <div class="status-section">
+        <h3>Status</h3>
+        <ul id="statusList"></ul>
+    </div>
+
+    <script src="popup.js" defer></script>
+</body>
+</html>
