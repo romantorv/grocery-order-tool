@@ -1,12 +1,30 @@
 // Popup Logic for Grocery Ordering Helper Extension
 
 // Get DOM references when the script loads
-const itemListInput = document.getElementById('itemListInput');
+const apiUrlInput = document.getElementById('apiUrlInput');
+const fetchButton = document.getElementById('fetchButton');
+const pendingItems = document.getElementById('pendingItems');
 const startButton = document.getElementById('startButton');
 const statusList = document.getElementById('statusList');
 
-// Add event listener to the start button
+// Store fetched items
+let currentItems = [];
+
+// Add event listeners
+fetchButton.addEventListener('click', fetchPendingItems);
 startButton.addEventListener('click', processItems);
+
+// Load saved API URL
+chrome.storage.sync.get(['apiUrl'], (result) => {
+    if (result.apiUrl) {
+        apiUrlInput.value = result.apiUrl;
+    }
+});
+
+// Save API URL when changed
+apiUrlInput.addEventListener('change', () => {
+    chrome.storage.sync.set({ apiUrl: apiUrlInput.value });
+});
 
 // Helper function to create a delay
 function sleep(ms) {
@@ -70,78 +88,123 @@ function showSuccessMessage(message) {
     statusList.parentNode.appendChild(successDiv);
 }
 
+// Function to fetch pending items from API
+async function fetchPendingItems() {
+    try {
+        // Clear any previous error/success messages
+        const existingMessages = document.querySelectorAll('.error-message, .success-message');
+        existingMessages.forEach(msg => msg.remove());
+
+        fetchButton.disabled = true;
+        fetchButton.textContent = 'Fetching...';
+
+        const apiUrl = apiUrlInput.value.trim();
+        if (!apiUrl) {
+            showErrorMessage('Please enter API URL');
+            return;
+        }
+
+        // Fetch pending items from extension endpoint
+        const response = await fetch(`${apiUrl}/api/extension/pending-items`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to fetch pending items');
+        }
+
+        currentItems = data.items || [];
+
+        // Display the items
+        displayPendingItems(currentItems);
+
+        // Enable/disable start button based on items
+        startButton.disabled = currentItems.length === 0;
+
+        if (currentItems.length === 0) {
+            showSuccessMessage('No pending items found');
+        } else {
+            showSuccessMessage(`Found ${currentItems.length} pending items`);
+        }
+
+    } catch (error) {
+        console.error('Error fetching pending items:', error);
+        showErrorMessage(`Error fetching items: ${error.message}`);
+        currentItems = [];
+        startButton.disabled = true;
+    } finally {
+        fetchButton.disabled = false;
+        fetchButton.textContent = 'Fetch Items';
+    }
+}
+
+// Function to display pending items in the UI
+function displayPendingItems(items) {
+    if (items.length === 0) {
+        pendingItems.innerHTML = '<div class="empty-state">No pending items found</div>';
+        return;
+    }
+
+    const itemsHtml = items.map(item => {
+        const truncatedUrl = item.productUrl.length > 50 ?
+            item.productUrl.substring(0, 47) + '...' :
+            item.productUrl;
+
+        return `
+            <div class="pending-item">
+                <span class="pending-item-url">${truncatedUrl}</span>
+                <div class="pending-item-details">
+                    Quantity: ${item.quantity} | User: ${item.userName}
+                    ${item.notes ? ` | Notes: ${item.notes}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    pendingItems.innerHTML = itemsHtml;
+}
+
 // Main function to process all items
 async function processItems() {
     try {
-        // Get input and clear any previous status
-        const inputText = itemListInput.value.trim();
+        // Clear any previous status
         statusList.innerHTML = '';
 
         // Clear any previous error/success messages
         const existingMessages = document.querySelectorAll('.error-message, .success-message');
         existingMessages.forEach(msg => msg.remove());
 
-        if (!inputText) {
-            showErrorMessage('Please enter some grocery items to process.');
+        if (currentItems.length === 0) {
+            showErrorMessage('No items to process. Please fetch items first.');
             return;
         }
 
-        // Parse and validate input
-        const lines = inputText.split('\n').filter(line => line.trim() !== '');
-        const items = [];
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            const parts = line.split(/\s+/);
-
-            if (parts.length < 2) {
-                showErrorMessage(`Line ${i + 1}: Invalid format. Expected "URL quantity"`);
-                return;
-            }
-
-            // URL is all parts except the last one (quantity)
-            const url = parts.slice(0, -1).join(' ');
-            const quantityStr = parts[parts.length - 1];
-
-            // Validate URL
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                showErrorMessage(`Line ${i + 1}: Invalid URL format. Must start with http:// or https://`);
-                return;
-            }
-
-            // Validate quantity
-            const quantity = parseInt(quantityStr, 10);
-            if (isNaN(quantity) || quantity <= 0) {
-                showErrorMessage(`Line ${i + 1}: Invalid quantity. Must be a positive number.`);
-                return;
-            }
-
-            // Create item object
-            const item = {
-                id: `item-${i}`,
-                url: url,
-                quantity: quantity,
-                status: 'waiting'
-            };
-            items.push(item);
-
-            // Create UI element for this item
+        // Create status items for each item
+        currentItems.forEach((item, index) => {
             const listItem = document.createElement('li');
-            listItem.id = item.id;
+            listItem.id = `item-${item._id}`;
             listItem.className = 'status-waiting';
 
-            const truncatedUrl = url.length > 50 ? url.substring(0, 47) + '...' : url;
+            const truncatedUrl = item.productUrl.length > 50 ?
+                item.productUrl.substring(0, 47) + '...' :
+                item.productUrl;
+
             listItem.innerHTML = `
                 <span class="item-url">${truncatedUrl}</span>
-                <span class="item-quantity">Quantity: ${quantity}</span>
+                <span class="item-quantity">Quantity: ${item.quantity} | User: ${item.userName}</span>
                 <span class="status status-waiting">Waiting to process</span>
             `;
 
             statusList.appendChild(listItem);
-        }
+        });
 
-        // Disable start button during processing
+        // Disable buttons during processing
         startButton.disabled = true;
+        fetchButton.disabled = true;
 
         // Get active tab
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -155,14 +218,15 @@ async function processItems() {
         // Process items sequentially
         let successCount = 0;
         let errorCount = 0;
+        const processedItemIds = [];
 
-        for (const item of items) {
+        for (const item of currentItems) {
             try {
                 // Update UI to show processing
-                updateItemStatus(item.id, 'Processing...', 'status-processing');
+                updateItemStatus(`item-${item._id}`, 'Processing...', 'status-processing');
 
                 // Navigate to the item URL
-                await chrome.tabs.update(tabId, { url: item.url });
+                await chrome.tabs.update(tabId, { url: item.productUrl });
 
                 // Wait for page to load
                 await waitForTabLoad(tabId);
@@ -180,22 +244,45 @@ async function processItems() {
                 // Process results
                 const result = results[0]?.result;
                 if (result && result.success) {
-                    updateItemStatus(item.id, 'Added to cart ✓', 'status-added');
+                    updateItemStatus(`item-${item._id}`, 'Added to cart ✓', 'status-added');
                     successCount++;
+                    processedItemIds.push(item._id);
                 } else {
                     const errorMsg = result?.error || 'Unknown error occurred';
-                    updateItemStatus(item.id, `Error: ${errorMsg}`, 'status-error');
+                    updateItemStatus(`item-${item._id}`, `Error: ${errorMsg}`, 'status-error');
                     errorCount++;
-                    console.error(`Failed to add item ${item.url}:`, errorMsg);
+                    console.error(`Failed to add item ${item.productUrl}:`, errorMsg);
+                    // Continue processing other items even if this one failed
                 }
 
                 // Delay between items
-                await sleep(5000);
+                await sleep(3000);
 
             } catch (error) {
-                updateItemStatus(item.id, `Error: ${error.message}`, 'status-error');
+                updateItemStatus(`item-${item._id}`, `Error: ${error.message}`, 'status-error');
                 errorCount++;
-                console.error(`Error processing item ${item.url}:`, error);
+                console.error(`Error processing item ${item.productUrl}:`, error);
+                // Continue processing other items even if this one failed
+            }
+        }
+
+        // Mark successfully processed items as ordered in the backend
+        if (processedItemIds.length > 0) {
+            try {
+                const apiUrl = apiUrlInput.value.trim();
+                const markOrderedResponse = await fetch(`${apiUrl}/api/extension/mark-ordered`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ itemIds: processedItemIds })
+                });
+
+                if (!markOrderedResponse.ok) {
+                    console.error('Failed to mark items as ordered in backend');
+                }
+            } catch (error) {
+                console.error('Error marking items as ordered:', error);
             }
         }
 
@@ -206,17 +293,18 @@ async function processItems() {
             showSuccessMessage(`✅ ${successCount} items added, ${errorCount} failed. Check the status above for details.`);
         }
 
+        // Refresh the pending items list
+        await fetchPendingItems();
+
     } catch (error) {
         console.error('Error in processItems:', error);
         showErrorMessage(`Unexpected error: ${error.message}`);
     } finally {
-        // Re-enable the start button
-        startButton.disabled = false;
+        // Re-enable the buttons
+        startButton.disabled = currentItems.length === 0;
+        fetchButton.disabled = false;
     }
 }
-
-// Note: updateItemQuantity() and addItemToCart() functions are now embedded
-// within addItemToCartOnPageWithHelpers() for content script injection
 
 // Content script function that gets injected into the grocery website page
 // This function will run in the context of the target website
@@ -302,6 +390,6 @@ async function addItemToCartOnPageWithHelpers(quantity) {
 
     } catch (error) {
         console.error('Error in addItemToCartOnPageWithHelpers:', error);
-        return { success: false, pending: false, error: error.message };
+        return { success: false, error: error.message };
     }
 }

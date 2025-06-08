@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Grocery Ordering Helper",
   "version": "1.0.0",
-  "description": "Automates adding grocery items to cart by pasting URLs and quantities",
+  "description": "Automates adding grocery items to cart by fetching pending orders from the database",
   "permissions": [
     "activeTab",
     "scripting",
@@ -10,7 +10,9 @@
   ],
   "host_permissions": [
     "*://*.kingfoodmart.com/*",
-    "*://localhost/*"
+    "*://localhost/*",
+    "http://localhost:3000/*",
+    "https://localhost:3000/*"
   ],
   "action": {
     "default_popup": "popup.html",
