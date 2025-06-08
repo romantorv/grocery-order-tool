@@ -36,9 +36,15 @@ export async function POST(req: NextRequest) {
         continue; // Skip invalid updates
       }
 
-      const updateData: any = {
+      const updateData: Partial<{
+        status: string;
+        updatedAt: Date;
+        completedAt: Date;
+        errorMessage: string;
+        price: number;
+      }> = {
         status,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       if (status === 'completed') {

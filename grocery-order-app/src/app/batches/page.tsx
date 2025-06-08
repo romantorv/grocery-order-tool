@@ -62,7 +62,7 @@ export default function BatchesPage() {
       } else {
         setError('Failed to fetch batches');
       }
-    } catch (err) {
+    } catch {
       setError('Network error');
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ export default function BatchesPage() {
         const data = await response.json();
         setError(data.error || 'Failed to reorder batch');
       }
-    } catch (err) {
+    } catch {
       setError('Network error');
     }
   };

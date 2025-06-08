@@ -3,12 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
-interface User {
-  displayName: string;
-  role: string;
-  sessionId: string;
-}
-
 interface GroceryItem {
   _id: string;
   productName: string;
@@ -33,8 +27,44 @@ interface OrderBatch {
   notes?: string;
 }
 
+async function getBatchDetails(batchId: string): Promise<{ batch: OrderBatch, items: GroceryItem[] }> {
+  try {
+    const token = localStorage.getItem('token');
+
+    // Fetch batch info
+    const batchResponse = await fetch(`/api/batches`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    // Fetch batch items
+    const itemsResponse = await fetch(`/api/batches/${batchId}/items`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (batchResponse.ok && itemsResponse.ok) {
+      const batchesData = await batchResponse.json();
+      const itemsData = await itemsResponse.json();
+
+      // Find the specific batch
+      const currentBatch = batchesData.find((b: OrderBatch) => b._id === batchId);
+      if (!currentBatch) {
+        throw new Error('Batch not found');
+      }
+      return { batch: currentBatch, items: itemsData };
+    } else {
+      throw new Error('Failed to fetch batch details');
+    }
+  } catch {
+    throw new Error('Network error');
+  }
+}
+
+
 export default function BatchDetailsPage() {
-  const [user, setUser] = useState<User | null>(null);
   const [batch, setBatch] = useState<OrderBatch | null>(null);
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,47 +83,17 @@ export default function BatchDetailsPage() {
       return;
     }
 
-    setUser(JSON.parse(userData));
     if (batchId) {
-      fetchBatchDetails();
+      getBatchDetails(batchId).then(({ batch, items }) => {
+        setBatch(batch);
+        setItems(items);
+      }).catch((error) => {
+        setError(error.message);
+      }).finally(() => {
+        setLoading(false);
+      });
     }
   }, [router, batchId]);
-
-  const fetchBatchDetails = async () => {
-    try {
-      const token = localStorage.getItem('token');
-
-      // Fetch batch info
-      const batchResponse = await fetch(`/api/batches`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      // Fetch batch items
-      const itemsResponse = await fetch(`/api/batches/${batchId}/items`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (batchResponse.ok && itemsResponse.ok) {
-        const batchesData = await batchResponse.json();
-        const itemsData = await itemsResponse.json();
-
-        // Find the specific batch
-        const currentBatch = batchesData.find((b: OrderBatch) => b._id === batchId);
-        setBatch(currentBatch);
-        setItems(itemsData);
-      } else {
-        setError('Failed to fetch batch details');
-      }
-    } catch (err) {
-      setError('Network error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleReorderBatch = async () => {
     try {
@@ -115,7 +115,7 @@ export default function BatchDetailsPage() {
         const data = await response.json();
         setError(data.error || 'Failed to reorder batch');
       }
-    } catch (err) {
+    } catch {
       setError('Network error');
     }
   };

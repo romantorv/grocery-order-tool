@@ -40,7 +40,7 @@ export default function AccessPage() {
       } else {
         setError(data.error || 'Authentication failed');
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);

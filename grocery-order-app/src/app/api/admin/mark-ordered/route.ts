@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       productUrl: item.productUrl,
       quantity: item.quantity,
       notes: item.notes,
-      userDisplayName: (item.userId as any).displayName
+      userDisplayName: item.userId?.displayName ?? 'Unknown User'
     }));
 
     return NextResponse.json({
