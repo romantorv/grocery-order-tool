@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AdminHeader from '@/components/admin/AdminHeader';
+import AdminTabs from '@/components/admin/AdminTabs';
+import ErrorAlert from '@/components/admin/ErrorAlert';
+import ItemsTable from '@/components/admin/ItemsTable';
+import StatusUpdateForm from '@/components/admin/StatusUpdateForm';
+import BatchesList from '@/components/admin/BatchesList';
+
+type TabType = 'pending' | 'ordered' | 'completed' | 'batches';
 
 interface User {
   displayName: string;
@@ -40,6 +48,12 @@ interface OrderBatch {
   createdAt: string;
 }
 
+interface StatusUpdate {
+  status: 'completed' | 'failed';
+  price?: number;
+  errorMessage?: string;
+}
+
 export default function AdminDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [allItems, setAllItems] = useState<GroceryItem[]>([]);
@@ -47,14 +61,8 @@ export default function AdminDashboard() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'pending' | 'ordered' | 'completed' | 'batches'>('pending');
-
-  // Status update form
-  const [statusUpdates, setStatusUpdates] = useState<{[key: string]: {
-    status: 'completed' | 'failed';
-    price?: number;
-    errorMessage?: string;
-  }}>({});
+  const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const [statusUpdates, setStatusUpdates] = useState<{[key: string]: StatusUpdate}>({});
 
   const router = useRouter();
 
@@ -194,6 +202,12 @@ export default function AdminDashboard() {
     }));
   };
 
+  const handleRemoveStatusUpdate = (itemId: string) => {
+    const newUpdates = { ...statusUpdates };
+    delete newUpdates[itemId];
+    setStatusUpdates(newUpdates);
+  };
+
   const handleSubmitStatusUpdates = async () => {
     const updates = Object.entries(statusUpdates).map(([itemId, update]) => ({
       itemId,
@@ -237,6 +251,11 @@ export default function AdminDashboard() {
     router.push('/');
   };
 
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setSelectedItems([]); // Clear selections when switching tabs
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -247,332 +266,48 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-gray-600">Welcome, {user?.displayName}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <AdminHeader
+        displayName={user?.displayName || ''}
+        onLogout={handleLogout}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tabs */}
-        <div className="mb-8">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'pending'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Pending ({allItems.filter(item => item.status === 'pending').length})
-            </button>
-            <button
-              onClick={() => setActiveTab('ordered')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'ordered'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Ordered ({allItems.filter(item => item.status === 'ordered').length})
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'completed'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Completed ({allItems.filter(item => item.status === 'completed').length})
-            </button>
-            <button
-              onClick={() => setActiveTab('batches')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'batches'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Order History ({batches.length})
-            </button>
-          </nav>
-        </div>
+        <AdminTabs
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          pendingCount={allItems.filter(item => item.status === 'pending').length}
+          orderedCount={allItems.filter(item => item.status === 'ordered').length}
+          completedCount={allItems.filter(item => item.status === 'completed').length}
+          batchesCount={batches.length}
+        />
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6">
-            {error}
-          </div>
-        )}
+        {error && <ErrorAlert message={error} />}
 
         {activeTab !== 'batches' && (
           <div className="space-y-6">
-            {/* Items List */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 capitalize">{activeTab} Items</h2>
-                {activeTab === 'pending' && (
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={handleSelectAll}
-                      className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                    >
-                      {selectedItems.length === filteredItems.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                    <button
-                      onClick={handleMarkOrdered}
-                      disabled={selectedItems.length === 0}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Mark Selected as Ordered ({selectedItems.length})
-                    </button>
-                  </div>
-                )}
-              </div>
+            <ItemsTable
+              activeTab={activeTab}
+              items={filteredItems}
+              selectedItems={selectedItems}
+              onSelectItem={handleSelectItem}
+              onSelectAll={handleSelectAll}
+              onMarkOrdered={handleMarkOrdered}
+            />
 
-              {filteredItems.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No {activeTab} items</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {activeTab === 'pending' && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Select
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          User
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Product
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity
-                        </th>
-                        {activeTab === 'completed' && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Price
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Notes
-                        </th>
-                        {activeTab === 'ordered' && (
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Batch
-                          </th>
-                        )}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredItems.map((item) => (
-                        <tr key={item._id}>
-                          {activeTab === 'pending' && (
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <input
-                                type="checkbox"
-                                checked={selectedItems.includes(item._id)}
-                                onChange={() => handleSelectItem(item._id)}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                              />
-                            </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.userId.displayName}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            <div>
-                              <div className="font-medium">{item.productName}</div>
-                              <div className="text-gray-500 text-xs">
-                                {new Date(item.createdAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.quantity}
-                          </td>
-                          {activeTab === 'completed' && (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.price ? `$${item.price.toFixed(2)}` : '-'}
-                            </td>
-                          )}
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {item.notes || '-'}
-                            {item.errorMessage && (
-                              <div className="text-red-600 text-xs mt-1">{item.errorMessage}</div>
-                            )}
-                          </td>
-                          {activeTab === 'ordered' && (
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              {item.batchId ? item.batchId.batchName : '-'}
-                            </td>
-                          )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <a
-                              href={item.productUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-800"
-                            >
-                              View Product
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Status Update Form - Only show for ordered items */}
             {activeTab === 'ordered' && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Update Order Status</h2>
-                <p className="text-sm text-gray-600 mb-4">
-                  After processing orders, update their status to completed or failed.
-                </p>
-
-                <div className="space-y-4">
-                  {Object.keys(statusUpdates).length === 0 ? (
-                    <p className="text-gray-500">No status updates pending</p>
-                  ) : (
-                    Object.entries(statusUpdates).map(([itemId, update]) => {
-                      const item = filteredItems.find(i => i._id === itemId);
-                      return (
-                        <div key={itemId} className="border border-gray-200 rounded-md p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-medium">{item?.productName}</span>
-                            <button
-                              onClick={() => {
-                                const newUpdates = { ...statusUpdates };
-                                delete newUpdates[itemId];
-                                setStatusUpdates(newUpdates);
-                              }}
-                              className="text-red-600 hover:text-red-800 text-sm"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Status
-                              </label>
-                              <select
-                                value={update.status || ''}
-                                onChange={(e) => handleStatusUpdate(itemId, 'status', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
-                              >
-                                <option value="">Select status</option>
-                                <option value="completed">Completed</option>
-                                <option value="failed">Failed</option>
-                              </select>
-                            </div>
-                            {update.status === 'completed' && (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Price
-                                </label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={update.price || ''}
-                                  onChange={(e) => handleStatusUpdate(itemId, 'price', parseFloat(e.target.value))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500"
-                                  placeholder="0.00"
-                                />
-                              </div>
-                            )}
-                            {update.status === 'failed' && (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                  Error Message
-                                </label>
-                                <input
-                                  type="text"
-                                  value={update.errorMessage || ''}
-                                  onChange={(e) => handleStatusUpdate(itemId, 'errorMessage', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500"
-                                  placeholder="Describe the error"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-
-                  {Object.keys(statusUpdates).length > 0 && (
-                    <button
-                      onClick={handleSubmitStatusUpdates}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-                    >
-                      Submit Status Updates ({Object.keys(statusUpdates).length})
-                    </button>
-                  )}
-                </div>
-              </div>
+              <StatusUpdateForm
+                items={filteredItems}
+                statusUpdates={statusUpdates}
+                onStatusUpdate={handleStatusUpdate}
+                onRemoveUpdate={handleRemoveStatusUpdate}
+                onSubmitUpdates={handleSubmitStatusUpdates}
+              />
             )}
           </div>
         )}
 
-        {/* Batches Tab */}
         {activeTab === 'batches' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Order History</h2>
-
-            {batches.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No completed batches</p>
-            ) : (
-              <div className="space-y-4">
-                {batches.map((batch) => (
-                  <div key={batch._id} className="border border-gray-200 rounded-md p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium text-gray-900">{batch.batchName}</h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {batch.itemCount} items • ${batch.totalValue.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Completed: {new Date(batch.completionDate).toLocaleDateString()}
-                        </p>
-                        {batch.notes && (
-                          <p className="text-sm text-gray-500 mt-1">{batch.notes}</p>
-                        )}
-                      </div>
-                      <a
-                        href={`/batches/${batch._id}`}
-                        className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                      >
-                        View Details
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <BatchesList batches={batches} />
         )}
       </div>
     </div>
