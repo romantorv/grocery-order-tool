@@ -4,9 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminHeader from '@/components/admin/AdminHeader';
 import AdminTabs from '@/components/admin/AdminTabs';
-import ErrorAlert from '@/components/admin/ErrorAlert';
+import ErrorAlert from '@/components/shared/ErrorAlert';
 import ItemsTable from '@/components/admin/ItemsTable';
-import StatusUpdateForm from '@/components/admin/StatusUpdateForm';
 import BatchesList from '@/components/admin/BatchesList';
 
 type TabType = 'pending' | 'ordered' | 'completed' | 'batches';
@@ -48,11 +47,7 @@ interface OrderBatch {
   createdAt: string;
 }
 
-interface StatusUpdate {
-  status: 'completed' | 'failed';
-  price?: number;
-  errorMessage?: string;
-}
+
 
 export default function AdminDashboard() {
   const [user, setUser] = useState<User | null>(null);
@@ -62,7 +57,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('pending');
-  const [statusUpdates, setStatusUpdates] = useState<{[key: string]: StatusUpdate}>({});
+
 
   const router = useRouter();
 
@@ -192,35 +187,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleStatusUpdate = (itemId: string, field: string, value: string | number) => {
-    setStatusUpdates(prev => ({
-      ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        [field]: value
-      }
-    }));
-  };
 
-  const handleRemoveStatusUpdate = (itemId: string) => {
-    const newUpdates = { ...statusUpdates };
-    delete newUpdates[itemId];
-    setStatusUpdates(newUpdates);
-  };
 
-  const handleSubmitStatusUpdates = async () => {
-    const updates = Object.entries(statusUpdates).map(([itemId, update]) => ({
-      itemId,
-      ...update
-    }));
-
-    if (updates.length === 0) {
-      alert('No status updates to submit');
+  const handleMarkCompleted = async () => {
+    if (selectedItems.length === 0) {
+      alert('Please select items to mark as completed');
       return;
     }
 
     try {
       const token = localStorage.getItem('token');
+      const updates = selectedItems.map(itemId => ({
+        itemId,
+        status: 'completed'
+      }));
+
       const response = await fetch('/api/admin/update-status', {
         method: 'POST',
         headers: {
@@ -232,18 +213,20 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        alert(`${data.itemsProcessed} items updated. ${data.batchesCreated} batches created.`);
-        setStatusUpdates({});
+        alert(`${data.itemsProcessed} items marked as completed. ${data.batchesCreated} batches created.`);
+        setSelectedItems([]);
         fetchAllItems();
         fetchBatches();
       } else {
         const data = await response.json();
-        setError(data.error || 'Failed to update statuses');
+        setError(data.error || 'Failed to mark items as completed');
       }
     } catch {
       setError('Network error');
     }
   };
+
+
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -292,17 +275,10 @@ export default function AdminDashboard() {
               onSelectItem={handleSelectItem}
               onSelectAll={handleSelectAll}
               onMarkOrdered={handleMarkOrdered}
+              onMarkCompleted={handleMarkCompleted}
             />
 
-            {activeTab === 'ordered' && (
-              <StatusUpdateForm
-                items={filteredItems}
-                statusUpdates={statusUpdates}
-                onStatusUpdate={handleStatusUpdate}
-                onRemoveUpdate={handleRemoveStatusUpdate}
-                onSubmitUpdates={handleSubmitStatusUpdates}
-              />
-            )}
+
           </div>
         )}
 

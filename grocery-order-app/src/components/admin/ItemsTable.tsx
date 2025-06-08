@@ -28,6 +28,7 @@ interface ItemsTableProps {
   onSelectItem: (itemId: string) => void;
   onSelectAll: () => void;
   onMarkOrdered: () => void;
+  onMarkCompleted?: () => void;
 }
 
 export default function ItemsTable({
@@ -36,7 +37,8 @@ export default function ItemsTable({
   selectedItems,
   onSelectItem,
   onSelectAll,
-  onMarkOrdered
+  onMarkOrdered,
+  onMarkCompleted
 }: ItemsTableProps) {
   if (activeTab === 'batches') {
     return null;
@@ -46,7 +48,7 @@ export default function ItemsTable({
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold text-gray-900 capitalize">{activeTab} Items</h2>
-        {activeTab === 'pending' && (
+        {(activeTab === 'pending' || activeTab === 'ordered') && (
           <div className="flex space-x-4">
             <button
               onClick={onSelectAll}
@@ -54,13 +56,24 @@ export default function ItemsTable({
             >
               {selectedItems.length === items.length ? 'Deselect All' : 'Select All'}
             </button>
-            <button
-              onClick={onMarkOrdered}
-              disabled={selectedItems.length === 0}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Mark Selected as Ordered ({selectedItems.length})
-            </button>
+            {activeTab === 'pending' && (
+              <button
+                onClick={onMarkOrdered}
+                disabled={selectedItems.length === 0}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Mark Selected as Ordered ({selectedItems.length})
+              </button>
+            )}
+            {activeTab === 'ordered' && onMarkCompleted && (
+              <button
+                onClick={onMarkCompleted}
+                disabled={selectedItems.length === 0}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Mark as Success Batch Order ({selectedItems.length})
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -72,7 +85,7 @@ export default function ItemsTable({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {activeTab === 'pending' && (
+                {(activeTab === 'pending' || activeTab === 'ordered') && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Select
                   </th>
@@ -107,7 +120,7 @@ export default function ItemsTable({
             <tbody className="bg-white divide-y divide-gray-200">
               {items.map((item) => (
                 <tr key={item._id}>
-                  {activeTab === 'pending' && (
+                  {(activeTab === 'pending' || activeTab === 'ordered') && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"

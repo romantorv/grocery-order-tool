@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import MemberHeader from '@/components/member/MemberHeader';
+import AddItemForm from '@/components/member/AddItemForm';
+import RecentBatchesList from '@/components/member/RecentBatchesList';
+import ItemsTabsNavigation from '@/components/shared/ItemsTabsNavigation';
+import MemberItemsList from '@/components/member/MemberItemsList';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 interface User {
   displayName: string;
@@ -44,9 +50,6 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   // Form state
-  const [productUrl, setProductUrl] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const router = useRouter();
@@ -130,14 +133,13 @@ export default function Dashboard() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (formData: { productUrl: string; quantity: number; notes: string }) => {
     setSubmitting(true);
     setError('');
 
     try {
       const token = localStorage.getItem('token');
-      const productName = generateProductName(productUrl);
+      const productName = generateProductName(formData.productUrl);
 
       const response = await fetch('/api/items', {
         method: 'POST',
@@ -147,18 +149,13 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           productName,
-          productUrl,
-          quantity,
-          notes: notes || undefined,
+          productUrl: formData.productUrl,
+          quantity: formData.quantity,
+          notes: formData.notes || undefined,
         }),
       });
 
       if (response.ok) {
-        // Reset form
-        setProductUrl('');
-        setQuantity(1);
-        setNotes('');
-
         // Refresh items
         fetchItems();
       } else {
@@ -203,199 +200,49 @@ export default function Dashboard() {
     router.push('/');
   };
 
-  const filteredItems = items.filter(item => item.status === activeTab);
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-600">Welcome, {user?.displayName}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <MemberHeader
+        displayName={user?.displayName || ''}
+        onLogout={handleLogout}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Add Item Form */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Item</h2>
+            <AddItemForm
+              onSubmit={handleSubmit}
+              submitting={submitting}
+              error={error}
+            />
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Product URL *
-                  </label>
-                  <input
-                    type="url"
-                    value={productUrl}
-                    onChange={(e) => setProductUrl(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500"
-                    placeholder="https://example.com/product"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <input
-                    type="text"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 placeholder-gray-500"
-                    placeholder="Optional notes about this item"
-                  />
-                </div>
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {submitting ? 'Adding...' : 'Add Item'}
-                </button>
-              </form>
-            </div>
-
-            {/* Recent Batches */}
-            <div className="bg-white rounded-lg shadow p-6 mt-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h2>
-
-              {batches.length === 0 ? (
-                <p className="text-gray-500 text-sm">No completed orders yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {batches.map((batch) => (
-                    <div key={batch._id} className="border border-gray-200 rounded-md p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-900">{batch.batchName}</h3>
-                        <button
-                          onClick={() => handleReorderBatch(batch._id)}
-                          className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                        >
-                          Reorder
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        {batch.itemCount} items • ${batch.totalValue.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(batch.completionDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <RecentBatchesList
+              batches={batches}
+              onReorder={handleReorderBatch}
+            />
           </div>
 
           {/* Items List */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow">
-              {/* Tabs */}
-              <div className="border-b border-gray-200">
-                <nav className="flex space-x-8 px-6">
-                  {(['pending', 'ordered', 'completed'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`py-4 px-1 border-b-2 font-medium text-sm capitalize ${
-                        activeTab === tab
-                          ? 'border-indigo-500 text-indigo-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      {tab} ({items.filter(item => item.status === tab).length})
-                    </button>
-                  ))}
-                </nav>
-              </div>
-
-              {/* Items */}
-              <div className="p-6">
-                {filteredItems.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    No {activeTab} items
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredItems.map((item) => (
-                      <div key={item._id} className="border border-gray-200 rounded-md p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="font-medium text-gray-900">{item.productName}</h3>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Quantity: {item.quantity}
-                              {item.price && ` • $${item.price.toFixed(2)}`}
-                            </p>
-                            {item.notes && (
-                              <p className="text-sm text-gray-500 mt-1">{item.notes}</p>
-                            )}
-                            {item.errorMessage && (
-                              <p className="text-sm text-red-600 mt-1">{item.errorMessage}</p>
-                            )}
-                            {item.batchId && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                Batch: {item.batchId.batchName}
-                              </p>
-                            )}
-                          </div>
-                          <div className="ml-4">
-                            <a
-                              href={item.productUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-800 text-sm"
-                            >
-                              View Product
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ItemsTabsNavigation
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                tabCounts={{
+                  pending: items.filter(item => item.status === 'pending').length,
+                  ordered: items.filter(item => item.status === 'ordered').length,
+                  completed: items.filter(item => item.status === 'completed').length
+                }}
+              />
+              <MemberItemsList
+                items={items}
+                activeTab={activeTab}
+              />
             </div>
           </div>
         </div>
