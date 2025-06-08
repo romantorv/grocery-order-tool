@@ -101,12 +101,12 @@ export async function initializeAppSettings() {
   const settings = [
     {
       key: 'member_access_code',
-      value: 'member123',
+      value: process.env.MEMBER_ACCESS_CODE,
       description: 'Access code for members'
     },
     {
       key: 'admin_access_code',
-      value: 'admin456',
+      value: process.env.ADMIN_ACCESS_CODE,
       description: 'Access code for administrators'
     }
   ];
